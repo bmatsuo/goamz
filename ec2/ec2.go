@@ -289,6 +289,37 @@ func (i Instance) IsSpotInstance() bool {
 	return false
 }
 
+// Response to a DescribeKeyPairs request.
+//
+// See http://goo.gl/A6edSU for more details.
+type DescribeKeyPairsResp struct {
+	RequestId string    `xml:"requestId"`
+	Keys      []KeyPair `xml:"keySet>item"`
+}
+
+// Response to CreateKeyPair and ImportKeyPair requests.
+//
+// See http://goo.gl/GIvCsf and http://goo.gl/uli6sp for more details.
+type KeyPairResp struct {
+	RequestId string `xml:"requestId"`
+	KeyPair
+}
+
+// Response to a DeleteKeyPair request.
+//
+// See http://goo.gl/lXa1f4 for more details.
+type DeleteKeyPairResp struct {
+	RequestId string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type KeyPair struct {
+	KeyName        string `xml:"keyName"`
+	KeyFingerprint string `xml:"keyFingerprint"`
+	// only CreateKeyPair responses contain private KeyMaterial
+	KeyMaterial string `xml:"keyMaterial,omitempty"`
+}
+
 type BlockDevice struct {
 	DeviceName string `xml:"deviceName"`
 	EBS        EBS    `xml:"ebs"`
@@ -359,6 +390,66 @@ type InstancePrivateIpAddress struct {
 type IamInstanceProfile struct {
 	ARN string `xml:"arn"`
 	Id  string `xml:"id"`
+}
+
+// Describe available key pairs.
+//
+// See http://goo.gl/A6edSU for more details.
+func (ec2 *EC2) DescribeKeyPairs(keyNames []string, filter *Filter) (resp *DescribeKeyPairsResp, err error) {
+	params := makeParams("DescribeKeyPairs")
+	addParamsList(params, "KeyName", keyNames)
+	filter.addParams(params)
+	resp = &DescribeKeyPairsResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// Import a key pair. No private key data is transferred.
+//
+// TODO example
+//
+// See http://goo.gl/uli6sp for more details.
+func (ec2 *EC2) ImportKeyPair(keyName string, publicKeyMaterial string) (resp *KeyPairResp, err error) {
+	params := makeParams("ImportKeyPair")
+	params["KeyName"] = keyName
+	params["PublicKeyMaterial"] = publicKeyMaterial
+	resp = &KeyPairResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// Create a key pair. Returns private key material in the response.
+//
+// See http://goo.gl/GIvCsf for more details.
+func (ec2 *EC2) CreateKeyPair(keyName string) (resp *KeyPairResp, err error) {
+	params := makeParams("CreateKeyPair")
+	params["KeyName"] = keyName
+	resp = &KeyPairResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// Delete a key pair.
+//
+// See http://goo.gl/lXa1f4 for more details.
+func (ec2 *EC2) DeleteKeyPair(keyName string) (resp *DeleteKeyPairResp, err error) {
+	params := makeParams("DeleteKeyPair")
+	params["KeyName"] = keyName
+	resp = &DeleteKeyPairResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
 }
 
 // RunInstances starts new instances in EC2.

@@ -256,6 +256,81 @@ func (s *S) TestDescribeInstancesExample2(c *gocheck.C) {
 	c.Assert(r0t1.Value, gocheck.Equals, "Production")
 }
 
+func (s *S) TestDescribeKeyPairsExample(c *gocheck.C) {
+	testServer.Response(200, nil, DescribeKeyPairsExample)
+
+	filter := ec2.NewFilter()
+	filter.Add("key-name", "*-key-pair")
+
+	resp, err := s.ec2.DescribeKeyPairs([]string{"my-key-pair"}, filter)
+	req := testServer.WaitRequest()
+	c.Assert(req.Form["Action"], gocheck.DeepEquals, []string{"DescribeKeyPairs"})
+	// the KeyName and Filter are reduntant in this case.
+	c.Assert(req.Form["KeyName.1"], gocheck.DeepEquals, []string{"my-key-pair"})
+	c.Assert(req.Form["Filter.1.Name"], gocheck.DeepEquals, []string{"key-name"})
+	c.Assert(req.Form["Filter.1.Value.1"], gocheck.DeepEquals, []string{"*-key-pair"})
+
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(resp.Keys, gocheck.HasLen, 1)
+	c.Assert(resp.Keys[0].KeyName, gocheck.Equals, "my-key-pair")
+	c.Assert(resp.Keys[0].KeyFingerprint, gocheck.Equals, "1f:51:ae:28:bf:89:e9:d8:1f:25:5d:37:2d:7d:b8:ca:9f:f5:f1:6f")
+}
+
+// TODO test errors InvalidKey.Format and InvalidKeyPair.Duplicate
+func (s *S) TestImportKeyPairExample(c *gocheck.C) {
+	testServer.Response(200, nil, ImportKeyPairExample)
+
+	resp, err := s.ec2.ImportKeyPair("my-key-pair", "FIXME")
+	req := testServer.WaitRequest()
+	c.Assert(req.Form["Action"], gocheck.DeepEquals, []string{"ImportKeyPair"})
+	c.Assert(req.Form["KeyName"], gocheck.DeepEquals, []string{"my-key-pair"})
+	c.Assert(req.Form["PublicKeyMaterial"], gocheck.DeepEquals, []string{"FIXME"})
+
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(resp.KeyName, gocheck.Equals, "my-key-pair")
+	c.Assert(resp.KeyFingerprint, gocheck.Equals, "1f:51:ae:28:bf:89:e9:d8:1f:25:5d:37:2d:7d:b8:ca:9f:f5:f1:6f")
+	c.Assert(resp.KeyMaterial, gocheck.Equals, "")
+}
+
+// TODO test errors InvalidKeyPair.Duplicate
+func (s *S) TestCreateKeyPairExample(c *gocheck.C) {
+	testServer.Response(200, nil, CreateKeyPairExample)
+	resp, err := s.ec2.CreateKeyPair("my-key-pair")
+	req := testServer.WaitRequest()
+
+	c.Assert(req.Form["Action"], gocheck.DeepEquals, []string{"CreateKeyPair"})
+	c.Assert(req.Form["KeyName"], gocheck.DeepEquals, []string{"my-key-pair"})
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(resp.KeyName, gocheck.Equals, "my-key-pair")
+	c.Assert(resp.KeyFingerprint, gocheck.Equals, "1f:51:ae:28:bf:89:e9:d8:1f:25:5d:37:2d:7d:b8:ca:9f:f5:f1:6f")
+	c.Assert(resp.KeyMaterial, gocheck.Equals, `---- BEGIN RSA PRIVATE KEY ----
+MIICiTCCAfICCQD6m7oRw0uXOjANBgkqhkiG9w0BAQUFADCBiDELMAkGA1UEBhMC
+VVMxCzAJBgNVBAgTAldBMRAwDgYDVQQHEwdTZWF0dGxlMQ8wDQYDVQQKEwZBbWF6
+b24xFDASBgNVBAsTC0lBTSBDb25zb2xlMRIwEAYDVQQDEwlUZXN0Q2lsYWMxHzAd
+BgkqhkiG9w0BCQEWEG5vb25lQGFtYXpvbi5jb20wHhcNMTEwNDI1MjA0NTIxWhcN
+MTIwNDI0MjA0NTIxWjCBiDELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAldBMRAwDgYD
+VQQHEwdTZWF0dGxlMQ8wDQYDVQQKEwZBbWF6b24xFDASBgNVBAsTC0lBTSBDb25z
+b2xlMRIwEAYDVQQDEwlUZXN0Q2lsYWMxHzAdBgkqhkiG9w0BCQEWEG5vb25lQGFt
+YXpvbi5jb20wgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMaK0dn+a4GmWIWJ
+21uUSfwfEvySWtC2XADZ4nB+BLYgVIk60CpiwsZ3G93vUEIO3IyNoH/f0wYK8m9T
+rDHudUZg3qX4waLG5M43q7Wgc/MbQITxOUSQv7c7ugFFDzQGBzZswY6786m86gpE
+Ibb3OhjZnzcvQAaRHhdlQWIMm2nrAgMBAAEwDQYJKoZIhvcNAQEFBQADgYEAtCu4
+nUhVVxYUntneD9+h8Mg9q6q+auNKyExzyLwaxlAoo7TJHidbtS4J5iNmZgXL0Fkb
+FFBjvSfpJIlJ00zbhNYS5f6GuoEDmFJl0ZxBHjJnyp378OD8uTs7fLvjx79LjSTb
+NYiytVbZPQUQ5Yaxu2jXnimvw3rrszlaEXAMPLE
+-----END RSA PRIVATE KEY-----`)
+}
+
+func (s *S) TestDeleteKeyPairExample(c *gocheck.C) {
+	testServer.Response(200, nil, DeleteKeyPairExample)
+	resp, err := s.ec2.DeleteKeyPair("my-key-pair")
+	req := testServer.WaitRequest()
+	c.Assert(req.Form["Action"], gocheck.DeepEquals, []string{"DeleteKeyPair"})
+	c.Assert(req.Form["KeyName"], gocheck.DeepEquals, []string{"my-key-pair"})
+	c.Assert(err, gocheck.IsNil)
+	c.Assert(resp.Return, gocheck.Equals, true)
+}
+
 func (s *S) TestDescribeAddressesPublicIPExample(c *gocheck.C) {
 	testServer.Response(200, nil, DescribeAddressesExample)
 
