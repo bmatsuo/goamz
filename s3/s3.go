@@ -104,11 +104,6 @@ func New(auth aws.Auth, region aws.Region) *S3 {
 	return &S3{auth, region, nil, 0}
 }
 
-// NewClient returns a new S3 using the given HTTP client for API calls.
-func NewClient(auth aws.Auth, region aws.Region, c *http.Client) *S3 {
-	return &S3{auth, region, c, 0}
-}
-
 // Bucket returns a Bucket with the given name.
 func (s3 *S3) Bucket(name string) *Bucket {
 	if s3.Region.S3BucketEndpoint != "" || s3.Region.S3LowercaseBucket {
