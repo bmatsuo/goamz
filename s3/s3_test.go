@@ -2,14 +2,15 @@ package s3_test
 
 import (
 	"bytes"
-	"github.com/crowdmob/goamz/aws"
-	"github.com/crowdmob/goamz/s3"
-	"github.com/crowdmob/goamz/testutil"
-	"gopkg.in/check.v1"
 	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/crowdmob/goamz/aws"
+	"github.com/crowdmob/goamz/s3"
+	"github.com/crowdmob/goamz/testutil"
+	"gopkg.in/check.v1"
 )
 
 func Test(t *testing.T) {
@@ -194,10 +195,8 @@ func (s *S) TestPutObject(c *check.C) {
 }
 
 func (s *S) TestPutObjectReadTimeout(c *check.C) {
-	s.s3.ReadTimeout = 50 * time.Millisecond
-	defer func() {
-		s.s3.ReadTimeout = 0
-	}()
+	timeouts3 := *s.s3 // copying S3 avoids propogating changes
+	timeouts3.Client = s3.HTTPTimeout(0, 50*time.Millisecond)
 
 	b := s.s3.Bucket("bucket")
 	err := b.Put("name", []byte("content"), "content-type", s3.Private, s3.Options{})

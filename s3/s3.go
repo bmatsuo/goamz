@@ -18,7 +18,6 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
-	"github.com/crowdmob/goamz/aws"
 	"io"
 	"io/ioutil"
 	"log"
@@ -29,6 +28,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/crowdmob/goamz/aws"
 )
 
 const debug = false
@@ -37,9 +38,8 @@ const debug = false
 type S3 struct {
 	aws.Auth
 	aws.Region
-	ConnectTimeout time.Duration
-	ReadTimeout    time.Duration
-	private        byte // Reserve the right of using private data.
+	*http.Client
+	private byte // Reserve the right of using private data.
 }
 
 // The Bucket type encapsulates operations with an S3 bucket.
@@ -87,9 +87,26 @@ var attempts = aws.AttemptStrategy{
 	Delay: 200 * time.Millisecond,
 }
 
+func HTTPTimeout(connect, read time.Duration) *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout:   connect,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+		},
+		Timeout: read,
+	}
+}
+
 // New creates a new S3.
 func New(auth aws.Auth, region aws.Region) *S3 {
-	return &S3{auth, region, 0, 0, 0}
+	return &S3{auth, region, nil, 0}
+}
+
+// NewClient returns a new S3 using the given HTTP client for API calls.
+func NewClient(auth aws.Auth, region aws.Region, c *http.Client) *S3 {
+	return &S3{auth, region, c, 0}
 }
 
 // Bucket returns a Bucket with the given name.
@@ -877,24 +894,9 @@ func (s3 *S3) run(req *request, resp interface{}) (*http.Response, error) {
 		hreq.Body = ioutil.NopCloser(req.payload)
 	}
 
-	c := http.Client{
-		Transport: &http.Transport{
-			Dial: func(netw, addr string) (c net.Conn, err error) {
-				deadline := time.Now().Add(s3.ReadTimeout)
-				if s3.ConnectTimeout > 0 {
-					c, err = net.DialTimeout(netw, addr, s3.ConnectTimeout)
-				} else {
-					c, err = net.Dial(netw, addr)
-				}
-				if err != nil {
-					return
-				}
-				if s3.ReadTimeout > 0 {
-					err = c.SetDeadline(deadline)
-				}
-				return
-			},
-		},
+	c := http.DefaultClient
+	if s3.Client != nil {
+		c = s3.Client
 	}
 
 	hresp, err := c.Do(&hreq)
